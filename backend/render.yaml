@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: lumio-api
+    runtime: python
+    plan: free                   # upgrade to starter ($7/mo) to avoid sleep
+    region: oregon               # change: oregon | frankfurt | singapore | ohio
+
+    buildCommand: |
+      apt-get update -qq
+      apt-get install -y --no-install-recommends ffmpeg
+      pip install --upgrade pip
+      pip install -r requirements.txt
+
+    startCommand: >
+      uvicorn main:app
+      --host 0.0.0.0
+      --port $PORT
+      --workers 1
+      --loop uvloop
+      --http httptools
+      --proxy-headers
+      --forwarded-allow-ips *
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+      # ── Set these in the Render dashboard (not here) ──
+      - key: ALLOWED_ORIGINS
+        sync: false              # fill in Render dashboard
+
+      - key: RATE_LIMIT_FETCH
+        value: 30/minute
+
+      - key: RATE_LIMIT_DOWNLOAD
+        value: 10/minute
+
+      - key: MAX_VIDEO_DURATION_SECONDS
+        value: "10800"
+
+      - key: DOWNLOAD_TIMEOUT_SECONDS
+        value: "600"
+
+      - key: TMP_DIR
+        value: /tmp/lumio_downloads
+
+      - key: CLEANUP_AFTER_SECONDS
+        value: "300"
