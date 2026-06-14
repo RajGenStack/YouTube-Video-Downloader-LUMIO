@@ -13,8 +13,8 @@ pipeline {
         FRONTEND_IMAGE = 'yt-downloader-frontend'
         IMAGE_TAG = "build-${env.BUILD_NUMBER}"
         
-        // Path to cookies file on host (stored outside workspace to survive cleanWs)
-        HOST_COOKIES_PATH = '/home/ubuntu/youtube_cookies/cookies.txt'
+        // Path to cookies directory on host (stored outside workspace to survive cleanWs)
+        HOST_COOKIES_DIR = '/home/ubuntu/youtube_cookies'
     }
     
     stages {
