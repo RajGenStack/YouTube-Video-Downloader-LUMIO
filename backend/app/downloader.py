@@ -89,7 +89,13 @@ def _base_ydl_opts() -> dict:
         },
     }
     if settings.COOKIES_FILE and os.path.isfile(settings.COOKIES_FILE):
-        opts["cookiefile"] = settings.COOKIES_FILE
+        try:
+            # Safely verify the file is readable and not a directory
+            with open(settings.COOKIES_FILE, "r") as f:
+                f.read(1)
+            opts["cookiefile"] = settings.COOKIES_FILE
+        except Exception as e:
+            logger.error(f"Cannot read cookies file at {settings.COOKIES_FILE}: {e}")
     if settings.PROXY_URL:
         opts["proxy"] = settings.PROXY_URL
     return opts
