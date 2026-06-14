@@ -144,6 +144,7 @@ def _base_ydl_opts() -> dict:
         "socket_timeout": 30,
         "retries":     3,
         "fragment_retries": 3,
+        "remote_components": ["ejs:github", "ejs:npm"],
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
