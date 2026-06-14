@@ -6,6 +6,12 @@ Real yt-dlp calls are mocked so tests run offline and fast.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+API_FETCH_INFO = "/api/fetch-info"
+API_DOWNLOAD = "/api/download"
+TEST_YOUTUBE_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+DOWNLOADER_THREAD_PATCH = "app.downloader.asyncio.to_thread"
+
+
 
 # ── Health ───────────────────────────────────────────────────────────────────
 class TestHealth:
@@ -26,16 +32,16 @@ class TestHealth:
 # ── Input validation ─────────────────────────────────────────────────────────
 class TestValidation:
     async def test_fetch_info_rejects_empty_url(self, client):
-        resp = await client.post("/api/fetch-info", json={"url": ""})
+        resp = await client.post(API_FETCH_INFO, json={"url": ""})
         assert resp.status_code == 422
 
     async def test_fetch_info_rejects_non_youtube_url(self, client):
-        resp = await client.post("/api/fetch-info", json={"url": "https://vimeo.com/123456"})
+        resp = await client.post(API_FETCH_INFO, json={"url": "https://vimeo.com/123456"})
         assert resp.status_code == 422
         assert "YouTube" in resp.json()["detail"]
 
     async def test_fetch_info_rejects_malformed_url(self, client):
-        resp = await client.post("/api/fetch-info", json={"url": "not-a-url-at-all"})
+        resp = await client.post(API_FETCH_INFO, json={"url": "not-a-url-at-all"})
         assert resp.status_code == 422
 
     async def test_fetch_info_accepts_standard_url(self, client):
@@ -53,65 +59,65 @@ class TestValidation:
             "is_live": False,
             "formats": [{"height": 720}, {"height": 1080}],
         }
-        with patch("app.downloader.asyncio.to_thread", new_callable=AsyncMock) as mock_thread:
+        with patch(DOWNLOADER_THREAD_PATCH, new_callable=AsyncMock) as mock_thread:
             mock_ydl = MagicMock()
             mock_ydl.extract_info.return_value = mock_info
             mock_thread.return_value = mock_info
             resp = await client.post(
-                "/api/fetch-info",
-                json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+                API_FETCH_INFO,
+                json={"url": TEST_YOUTUBE_URL},
             )
         # Either 200 (mock worked) or 422 (yt-dlp error in test env) — not 500
         assert resp.status_code in (200, 422)
 
     async def test_fetch_info_accepts_shorts_url(self, client):
         resp_body = {"url": "https://www.youtube.com/shorts/dQw4w9WgXcQ"}
-        with patch("app.downloader.asyncio.to_thread", new_callable=AsyncMock) as m:
+        with patch(DOWNLOADER_THREAD_PATCH, new_callable=AsyncMock) as m:
             m.side_effect = ValueError("mocked error")
-            resp = await client.post("/api/fetch-info", json=resp_body)
+            resp = await client.post(API_FETCH_INFO, json=resp_body)
         assert resp.status_code == 422   # yt-dlp error, not validation error → 422 not 500
 
     async def test_fetch_info_accepts_youtu_be_url(self, client):
-        with patch("app.downloader.asyncio.to_thread", new_callable=AsyncMock) as m:
+        with patch(DOWNLOADER_THREAD_PATCH, new_callable=AsyncMock) as m:
             m.side_effect = ValueError("mocked error")
             resp = await client.post(
-                "/api/fetch-info",
+                API_FETCH_INFO,
                 json={"url": "https://youtu.be/dQw4w9WgXcQ"},
             )
         assert resp.status_code == 422   # passes URL validation, fails yt-dlp (expected)
 
     async def test_download_rejects_invalid_mode(self, client):
         resp = await client.post(
-            "/api/download",
-            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "flac", "quality": "320k"},
+            API_DOWNLOAD,
+            json={"url": TEST_YOUTUBE_URL, "mode": "flac", "quality": "320k"},
         )
         assert resp.status_code == 422
 
     async def test_download_rejects_invalid_quality_for_mp3(self, client):
         resp = await client.post(
-            "/api/download",
-            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "mp3", "quality": "9000k"},
+            API_DOWNLOAD,
+            json={"url": TEST_YOUTUBE_URL, "mode": "mp3", "quality": "9000k"},
         )
         assert resp.status_code == 422
 
     async def test_download_rejects_invalid_quality_for_mp4(self, client):
         resp = await client.post(
-            "/api/download",
-            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "mp4", "quality": "9999p"},
+            API_DOWNLOAD,
+            json={"url": TEST_YOUTUBE_URL, "mode": "mp4", "quality": "9999p"},
         )
         assert resp.status_code == 422
 
     async def test_download_rejects_mp3_quality_on_mp4_mode(self, client):
         resp = await client.post(
-            "/api/download",
-            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "mp4", "quality": "320k"},
+            API_DOWNLOAD,
+            json={"url": TEST_YOUTUBE_URL, "mode": "mp4", "quality": "320k"},
         )
         assert resp.status_code in (400, 422)
 
     async def test_download_rejects_mp4_quality_on_mp3_mode(self, client):
         resp = await client.post(
-            "/api/download",
-            json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "mode": "mp3", "quality": "720p"},
+            API_DOWNLOAD,
+            json={"url": TEST_YOUTUBE_URL, "mode": "mp3", "quality": "720p"},
         )
         assert resp.status_code in (400, 422)
 
@@ -121,7 +127,7 @@ class TestSchemas:
     def test_valid_youtube_urls_pass(self):
         from app.schemas import FetchInfoRequest
         valid_urls = [
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            TEST_YOUTUBE_URL,
             "https://youtu.be/dQw4w9WgXcQ",
             "https://www.youtube.com/shorts/dQw4w9WgXcQ",
             "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -149,7 +155,7 @@ class TestSchemas:
         from app.schemas import DownloadRequest, VALID_MP3_QUALITIES
         for q in VALID_MP3_QUALITIES:
             req = DownloadRequest(
-                url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                url=TEST_YOUTUBE_URL,
                 mode="mp3",
                 quality=q,
             )
@@ -159,7 +165,7 @@ class TestSchemas:
         from app.schemas import DownloadRequest, VALID_MP4_QUALITIES
         for q in VALID_MP4_QUALITIES:
             req = DownloadRequest(
-                url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                url=TEST_YOUTUBE_URL,
                 mode="mp4",
                 quality=q,
             )
@@ -256,5 +262,5 @@ class TestErrorHandlers:
         assert resp.json()["code"] == "NOT_FOUND"
 
     async def test_method_not_allowed(self, client):
-        resp = await client.get("/api/fetch-info")   # GET on a POST endpoint
+        resp = await client.get(API_FETCH_INFO)   # GET on a POST endpoint
         assert resp.status_code == 405
