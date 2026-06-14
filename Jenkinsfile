@@ -22,6 +22,44 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    echo "Running SonarQube static code analysis..."
+                    // Requires the 'SonarQube Scanner' plugin and server configured under system settings
+                    withSonarQubeEnv('SonarQubeServer') {
+                        // Requires 'sonar-scanner' CLI tool configured under Global Tool Configuration
+                        def sonarScanner = tool name: 'sonar-scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
+                        sh "${sonarScanner} -Dsonar.projectKey=yt-downloader -Dsonar.sources=."
+                    }
+                }
+            }
+        }
+
+        stage('OWASP Dependency-Check') {
+            steps {
+                script {
+                    echo "Running OWASP Dependency-Check dependency scanner..."
+                    // Requires 'dependency-check' configured under Global Tool Configuration
+                    def dependencyCheckTool = tool name: 'dependency-check', type: 'org.jenkinsci.plugins.DependencyCheck.DependencyCheckToolInstallation'
+                    
+                    // Execute OWASP scan
+                    sh "${dependencyCheckTool} --scan ./ --out ./dependency-check-report.xml --format XML --format HTML"
+                    
+                    // Publish Dependency-Check XML results to the Jenkins build report page
+                    dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                }
+            }
+        }
+
+        stage('Trivy Filesystem Scan') {
+            steps {
+                echo "Running Trivy filesystem security scanning..."
+                // Scan workspace repository filesystem for security vulnerabilities
+                sh "trivy fs --severity HIGH,CRITICAL --format table ."
+            }
+        }
+
         stage('Build Images') {
             steps {
                 echo "Building Docker images..."
@@ -29,6 +67,15 @@ pipeline {
                 sh "docker build -t ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} -t ${REGISTRY}/${BACKEND_IMAGE}:latest -f backend/Dockerfile backend/"
                 // Build Frontend image
                 sh "docker build -t ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${REGISTRY}/${FRONTEND_IMAGE}:latest -f frontend/Dockerfile frontend/"
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                echo "Running Trivy image vulnerability scanning..."
+                // Scan the newly built Docker images before they are pushed to the registry
+                sh "trivy image --severity HIGH,CRITICAL --format table ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
+                sh "trivy image --severity HIGH,CRITICAL --format table ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
             }
         }
 
