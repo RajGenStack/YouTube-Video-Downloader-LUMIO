@@ -95,7 +95,7 @@ pipeline {
             steps {
                 echo "Deploying applications with Docker Compose..."
                 sh "docker-compose -f docker-compose.prod.yml down || true"
-                sh "docker-compose -f docker-compose.prod.yml up -d"
+                sh "docker-compose -f docker-compose.prod.yml up -d --build"
             }
         }
     }
