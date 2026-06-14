@@ -30,7 +30,6 @@ AUDIO_BITRATE_MAP: dict[str, str] = {
     "128k": "128",
     "160k": "160",
     "320k": "320",
-    "620k": "0",    # VBR best ≈ lossless
 }
 
 VIDEO_FORMAT_MAP: dict[str, str] = {
@@ -91,6 +90,8 @@ def _base_ydl_opts() -> dict:
     }
     if settings.COOKIES_FILE and os.path.isfile(settings.COOKIES_FILE):
         opts["cookiefile"] = settings.COOKIES_FILE
+    if settings.PROXY_URL:
+        opts["proxy"] = settings.PROXY_URL
     return opts
 
 

@@ -37,7 +37,7 @@ class FetchInfoRequest(BaseModel):
         return _validate_yt_url(v)
 
 
-VALID_MP3_QUALITIES = {"70k", "128k", "160k", "320k", "620k"}
+VALID_MP3_QUALITIES = {"70k", "128k", "160k", "320k"}
 VALID_MP4_QUALITIES = {
     "144p", "240p", "360p", "480p", "720p",
     "1080p", "1440p", "2160p", "4320p",

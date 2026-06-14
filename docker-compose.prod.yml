@@ -1,0 +1,36 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    # Expose only the frontend reverse-proxy to the public internet
+    ports:
+      - '80:80'
+      - '443:443'
+    networks:
+      - public_net
+      - private_net
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # NO PORT MAPPING here. Port 8000 is private to the Docker network.
+    networks:
+      - private_net
+    environment:
+      - ENVIRONMENT=production
+      - ALLOWED_ORIGINS=http://localhost,https://localhost
+      # Configured in production via your EC2 environment variables or .env file
+      # - PROXY_URL=http://user:pass@proxy-host:port
+      # - COOKIES_FILE=cookies.txt
+    restart: unless-stopped
+
+networks:
+  public_net:
+    driver: bridge
+  private_net:
+    driver: bridge

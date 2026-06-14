@@ -1,8 +1,8 @@
 // Client-side app entrypoint. Move the script logic from public/index.html into this file for production.
 
-const downloadApiEndpoint = (typeof window !== 'undefined' && window.location.port === '3000')
+const downloadApiEndpoint = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
   ? `${window.location.protocol}//${window.location.hostname}:8000`
-  : 'http://localhost:8000';
+  : window.location.origin;
 let mode = 'mp3', fmt = '320k';
 let fetchedVideoId = null;
 let fetchedUrl = '';

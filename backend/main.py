@@ -99,7 +99,7 @@ def create_app() -> FastAPI:
         version=settings.APP_VERSION,
         description=(
             "Production-grade YouTube downloader API.\n\n"
-            "Supports MP3 (70k–620k) and MP4 (144p–8K HDR) downloads.\n\n"
+            "Supports MP3 (70k–320k) and MP4 (144p–8K HDR) downloads.\n\n"
             "All processing happens server-side via yt-dlp + FFmpeg."
         ),
         docs_url="/docs" if settings.ENVIRONMENT != "production" else None,

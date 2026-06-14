@@ -165,7 +165,7 @@ Download and stream video or audio file.
 | Field | Values |
 |---|---|
 | `mode` | `mp3` or `mp4` |
-| MP3 `quality` | `70k` `128k` `160k` `320k` `620k` |
+| MP3 `quality` | `70k` `128k` `160k` `320k` |
 | MP4 `quality` | `144p` `240p` `360p` `480p` `720p` `1080p` `1440p` `2160p` `4320p` `1080p-hdr` `1440p-hdr` `4k-hdr` `8k-hdr` |
 
 **Response:** Binary file stream with `Content-Disposition` header.

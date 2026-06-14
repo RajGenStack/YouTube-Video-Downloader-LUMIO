@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # ── yt-dlp cookies (optional, helps with age-restricted) ──
     COOKIES_FILE: str = ""                   # absolute path to cookies.txt
 
+    # ── Proxy support (optional, helps with cloud IP bans) ──
+    PROXY_URL: str = ""                      # e.g. http://user:pass@host:port
+
     # ── Logging ────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
 
