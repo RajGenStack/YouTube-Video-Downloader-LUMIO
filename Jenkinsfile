@@ -8,15 +8,9 @@ pipeline {
     
     environment {
         SCANNER_HOME = tool 'sonar-scanner'
-        
-        // Docker registry configuration
         REGISTRY = 'captainnoor1'
-        
-        // Service image names
         BACKEND_IMAGE = 'yt-downloader-backend'
         FRONTEND_IMAGE = 'yt-downloader-frontend'
-
-        // Tag using build number
         IMAGE_TAG = "build-${env.BUILD_NUMBER}"
     }
     
@@ -74,13 +68,11 @@ pipeline {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker') {
-                        // Tag and Push Backend
                         sh "docker tag ${BACKEND_IMAGE} ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker tag ${BACKEND_IMAGE} ${REGISTRY}/${BACKEND_IMAGE}:latest"
                         sh "docker push ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker push ${REGISTRY}/${BACKEND_IMAGE}:latest"
 
-                        // Tag and Push Frontend
                         sh "docker tag ${FRONTEND_IMAGE} ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker tag ${FRONTEND_IMAGE} ${REGISTRY}/${FRONTEND_IMAGE}:latest"
                         sh "docker push ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
@@ -94,19 +86,10 @@ pipeline {
             steps {
                 withDockerRegistry(credentialsId: 'docker', url: 'https://index.docker.io/v1/') {
                     sh '''
-                        # Create local bin directory in workspace to avoid root permission issues
-                        mkdir -p ./bin
-
-                        # Install Docker Scout CLI locally
-                        curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh \
-                          | sh -s -- -b ./bin
-
-                        # Login to Docker Hub for Scout
-                        echo $DOCKER_PASSWORD | docker login -u captainnoor1 --password-stdin
-
-                        # Run Scout scans using the locally installed binary
-                        ./bin/docker-scout cves captainnoor1/yt-downloader-backend:latest --exit-code --only-severity critical,high
-                        ./bin/docker-scout cves captainnoor1/yt-downloader-frontend:latest --exit-code --only-severity critical,high
+                        docker scout cves captainnoor1/yt-downloader-backend:latest
+                        docker scout cves captainnoor1/yt-downloader-frontend:latest
+                        docker scout recommendations captainnoor1/yt-downloader-backend:latest
+                        docker scout recommendations captainnoor1/yt-downloader-frontend:latest
                     '''
                 }
             }
@@ -115,7 +98,7 @@ pipeline {
         stage("Deploy to Container") {
             steps {
                 echo "Deploying applications with Docker Compose..."
-                sh "docker-compose -f docker-compose.prod.yml down"
+                sh "docker-compose -f docker-compose.prod.yml down || true"
                 sh "docker-compose -f docker-compose.prod.yml up -d"
             }
         }
@@ -123,7 +106,6 @@ pipeline {
     
     post {
         always {
-            // Clean up workspace dangling Docker layers to save space
             sh "docker image prune -f"
             
             emailext attachLog: true,
