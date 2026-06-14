@@ -1,126 +1,148 @@
 pipeline {
     agent any
-
+    
+    tools {
+        jdk 'jdk17'
+        nodejs 'node23'
+    }
+    
     environment {
-        // Docker registry configuration (e.g., Docker Hub)
+        SCANNER_HOME = tool 'sonar-scanner'
+        
+        // Docker registry configuration
         REGISTRY = 'captainnoor1'
-        DOCKER_CREDS_ID = 'docker-hub-credentials' // Jenkins Credential ID for Docker Hub username/password
-
+        
         // Service image names
         BACKEND_IMAGE = 'yt-downloader-backend'
         FRONTEND_IMAGE = 'yt-downloader-frontend'
 
-        // Tag using build number, default to latest as secondary tag
+        // Tag using build number
         IMAGE_TAG = "build-${env.BUILD_NUMBER}"
     }
-
+    
     stages {
-        stage('Checkout') {
+        stage("clean workspace") {
             steps {
-                // Checkout code from Git repository
-                checkout scm
+                cleanWs()
             }
         }
-
-        stage('SonarQube Analysis') {
+        
+        stage("Git Checkout") {
             steps {
-                script {
-                    echo "Running SonarQube static code analysis..."
-                    // Requires the 'SonarQube Scanner' plugin and server configured under system settings
-                    withSonarQubeEnv('SonarQubeServer') {
-                        // Requires 'sonar-scanner' CLI tool configured under Global Tool Configuration
-                        def sonarScanner = tool name: 'sonar-scanner', type: 'hudson.plugins.sonar.SonarRunnerInstallation'
-                        sh "${sonarScanner} -Dsonar.projectKey=yt-downloader -Dsonar.sources=."
-                    }
+                git branch: 'main', url: 'https://github.com/RajGenStack/YouTube-Video-Downloader-LUMIO.git'
+            }
+        }
+        
+        stage("Sonarqube Analysis") {
+            steps {
+                withSonarQubeEnv('sonar-server') {
+                    sh " \$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=yt-downloader -Dsonar.projectKey=yt-downloader "
                 }
             }
         }
-
-        stage('OWASP Dependency-Check') {
+        
+        stage("Code Quality Gate") {
             steps {
                 script {
-                    echo "Running OWASP Dependency-Check dependency scanner..."
-                    // Requires 'dependency-check' configured under Global Tool Configuration
-                    def dependencyCheckTool = tool name: 'dependency-check', type: 'org.jenkinsci.plugins.DependencyCheck.DependencyCheckToolInstallation'
-                    
-                    // Execute OWASP scan
-                    sh "${dependencyCheckTool} --scan ./ --out ./dependency-check-report.xml --format XML --format HTML"
-                    
-                    // Publish Dependency-Check XML results to the Jenkins build report page
-                    dependencyCheckPublisher pattern: 'dependency-check-report.xml'
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
                 }
-            }
+            } 
         }
 
-        stage('Trivy Filesystem Scan') {
+        stage('OWASP FS SCAN') {
             steps {
-                echo "Running Trivy filesystem security scanning..."
-                // Scan workspace repository filesystem for security vulnerabilities
-                sh "trivy fs --severity HIGH,CRITICAL --format table ."
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit --update -n', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
-
-        stage('Build Images') {
+        
+        stage("Trivy File Scan") {
             steps {
-                echo "Building Docker images..."
-                // Build Backend image
-                sh "docker build -t ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG} -t ${REGISTRY}/${BACKEND_IMAGE}:latest -f backend/Dockerfile backend/"
-                // Build Frontend image
-                sh "docker build -t ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${REGISTRY}/${FRONTEND_IMAGE}:latest -f frontend/Dockerfile frontend/"
+                sh "trivy fs . > trivy.txt"
             }
         }
-
-        stage('Trivy Image Scan') {
+        
+        stage("Build Docker Image") {
             steps {
-                echo "Running Trivy image vulnerability scanning..."
-                // Scan the newly built Docker images before they are pushed to the registry
-                sh "trivy image --severity HIGH,CRITICAL --format table ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
-                sh "trivy image --severity HIGH,CRITICAL --format table ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
+                echo "Building Docker images for Backend and Frontend..."
+                sh "docker build -t ${BACKEND_IMAGE} -f backend/Dockerfile backend/"
+                sh "docker build -t ${FRONTEND_IMAGE} -f frontend/Dockerfile frontend/"
             }
         }
-
-        stage('Push Images') {
+        
+        stage("Tag & Push to DockerHub") {
             steps {
                 script {
-                    echo "Logging into Docker registry and pushing images..."
-                    // Login to Docker Hub using credentials stored in Jenkins
-                    withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDS_ID, passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
-                        sh "echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin"
-                        
-                        // Push Backend tags
+                    withDockerRegistry(credentialsId: 'docker') {
+                        // Tag and Push Backend
+                        sh "docker tag ${BACKEND_IMAGE} ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
+                        sh "docker tag ${BACKEND_IMAGE} ${REGISTRY}/${BACKEND_IMAGE}:latest"
                         sh "docker push ${REGISTRY}/${BACKEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker push ${REGISTRY}/${BACKEND_IMAGE}:latest"
 
-                        // Push Frontend tags
+                        // Tag and Push Frontend
+                        sh "docker tag ${FRONTEND_IMAGE} ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
+                        sh "docker tag ${FRONTEND_IMAGE} ${REGISTRY}/${FRONTEND_IMAGE}:latest"
                         sh "docker push ${REGISTRY}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker push ${REGISTRY}/${FRONTEND_IMAGE}:latest"
                     }
                 }
             }
         }
+        
+        stage('Docker Scout Image') {
+            steps {
+                withDockerRegistry(credentialsId: 'docker', url: 'https://index.docker.io/v1/') {
+                    sh '''
+                        # Install Docker Scout CLI directly
+                        curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh \
+                          | sh -s -- -b /usr/local/bin
 
-        stage('Deploy') {
+                        # Login to Docker Hub for Scout
+                        echo $DOCKER_PASSWORD | docker login -u captainnoor1 --password-stdin
+
+                        # Run Scout scans
+                        docker scout cves captainnoor1/yt-downloader-backend:latest --exit-code --only-severity critical,high
+                        docker scout cves captainnoor1/yt-downloader-frontend:latest --exit-code --only-severity critical,high
+                    '''
+                }
+            }
+        }
+        
+        stage("Deploy to Container") {
             steps {
                 echo "Deploying applications with Docker Compose..."
-                // Deploy locally or on target machine (run production docker-compose configuration)
-                // Note: If deploying to a remote host, configure an SSH Agent or remote Docker context
                 sh "docker-compose -f docker-compose.prod.yml down"
                 sh "docker-compose -f docker-compose.prod.yml up -d"
             }
         }
     }
-
+    
     post {
         always {
-            echo "Cleaning up local workspace build artifacts and dangling Docker layers..."
-            // Prune dangling images to conserve agent disk space
+            // Clean up workspace dangling Docker layers to save space
             sh "docker image prune -f"
-        }
-        success {
-            echo "Pipeline built and deployed successfully!"
-        }
-        failure {
-            echo "Pipeline execution failed. Check console output for debugging."
+            
+            emailext attachLog: true,
+                subject: "'${currentBuild.result}'",
+                body: """
+                    <html>
+                    <body>
+                        <div style="background-color: #FFA07A; padding: 10px; margin-bottom: 10px;">
+                            <p style="color: white; font-weight: bold;">Project: ${env.JOB_NAME}</p>
+                        </div>
+                        <div style="background-color: #90EE90; padding: 10px; margin-bottom: 10px;">
+                            <p style="color: white; font-weight: bold;">Build Number: ${env.BUILD_NUMBER}</p>
+                        </div>
+                        <div style="background-color: #87CEEB; padding: 10px; margin-bottom: 10px;">
+                            <p style="color: white; font-weight: bold;">URL: ${env.BUILD_URL}</p>
+                        </div>
+                    </body>
+                    </html>
+                """,
+                to: 'tomholland1953sm@gmail.com',
+                mimeType: 'text/html',
+                attachmentsPattern: 'trivy.txt'
         }
     }
 }
