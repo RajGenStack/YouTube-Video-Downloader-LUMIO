@@ -74,8 +74,10 @@ def safe_filename(name: str, ext: str) -> str:
 def _get_netscape_cookies(cookies_path: str) -> Optional[str]:
     """
     Read cookies from cookies_path. If it is in JSON format, convert it
-    to Netscape cookies format and write it to a temporary file, returning its path.
-    Otherwise, if it is already Netscape format, return the original cookies_path.
+    to Netscape cookies format and write it to a temporary writeable file.
+    If it is Netscape format, copy it to a temporary writeable file.
+    Returns the path to the temporary writeable cookies file to prevent
+    yt-dlp write-back failures on read-only mount systems.
     """
     if not cookies_path or not os.path.isfile(cookies_path):
         return None
@@ -86,6 +88,8 @@ def _get_netscape_cookies(cookies_path: str) -> Optional[str]:
             
         if not content:
             return None
+
+        writeable_path = os.path.join(settings.TMP_DIR, "active_cookies.txt")
 
         # Check if content looks like JSON
         if content.startswith("["):
@@ -110,20 +114,24 @@ def _get_netscape_cookies(cookies_path: str) -> Optional[str]:
                     if name and value and domain:
                         lines.append(f"{domain}\t{flag}\t{path}\t{secure_val}\t{expiration}\t{name}\t{value}")
                 
-                # Write to a converted file in TMP_DIR
-                converted_path = os.path.join(settings.TMP_DIR, "converted_cookies.txt")
-                with open(converted_path, "w", encoding="utf-8") as out_f:
+                with open(writeable_path, "w", encoding="utf-8") as out_f:
                     out_f.write("\n".join(lines) + "\n")
                 
-                logger.info(f"Successfully converted JSON cookies to Netscape format at {converted_path}")
-                return converted_path
+                logger.info(f"Successfully converted JSON cookies to Netscape format at {writeable_path}")
+                return writeable_path
             except json.JSONDecodeError:
                 pass
                 
-        return cookies_path
+        # If not JSON, copy the Netscape cookies file content to the writeable path
+        with open(writeable_path, "w", encoding="utf-8") as out_f:
+            out_f.write(content + "\n")
+            
+        logger.info(f"Copied Netscape cookies file to writeable path at {writeable_path}")
+        return writeable_path
     except Exception as e:
         logger.error(f"Error checking/converting cookies file: {e}")
         return cookies_path
+
 
 
 def _base_ydl_opts() -> dict:
