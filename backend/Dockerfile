@@ -22,12 +22,17 @@ RUN pip install --upgrade pip \
 # ── Stage 2: production image ─────────────────────────────────────────────────
 FROM python:3.11-slim AS production
 
-# Install FFmpeg (required for audio extraction and video merging) and Node.js (for yt-dlp JS challenge solver)
+# Install FFmpeg, curl, and unzip (required for Deno installer)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
-    nodejs \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Deno globally (recommended JS runtime for yt-dlp signature deciphering)
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && mv /root/.deno/bin/deno /usr/local/bin/ \
+    && rm -rf /root/.deno
 
 # Create non-root user for security
 RUN groupadd --gid 1001 lumio \
