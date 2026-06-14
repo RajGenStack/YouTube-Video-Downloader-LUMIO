@@ -574,7 +574,7 @@ footer{
   .nav-center{display:none}
   .breadcrumb{padding:12px 20px}
   .hero{padding:36px 16px 44px}
-  .tool-card{padding:20px 16px;border-radius:20px}
+  .tool-card{padding:24px 16px;border-radius:20px}
   .section{padding:48px 20px}
   .steps{grid-template-columns:1fr}
   .step-connector{display:none}
@@ -582,6 +582,103 @@ footer{
   .footer-top{grid-template-columns:1fr 1fr}
   .footer-bottom{flex-direction:column;gap:12px;text-align:center}
   footer{padding:40px 20px 24px}
-  .stats-bar{flex-wrap:wrap}
-  .stat-item{border-right:none;border-bottom:1px solid var(--border)}
+  
+  /* Make table scrollable horizontally instead of getting cut off */
+  .fmt-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table {
+    min-width: 600px;
+  }
+
+  /* Make stats bar a clean 2x2 grid */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat-item {
+    max-width: none;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 10px;
+  }
+  .stat-item:nth-child(2n) {
+    border-right: none;
+  }
+  .stat-item:last-child {
+    grid-column: span 2;
+    border-bottom: none;
+    border-right: none;
+  }
+}
+
+@media(max-width:520px){
+  /* Stack search input and fetch button on small screens */
+  .url-wrap {
+    flex-direction: column;
+    padding: 12px;
+    gap: 12px;
+    border-radius: var(--r-sm);
+  }
+  .url-icon {
+    display: none;
+  }
+  .url-input {
+    width: 100%;
+    padding: 8px 4px;
+    font-size: 14px;
+  }
+  .btn-fetch {
+    width: 100%;
+    justify-content: center;
+    padding: 14px;
+    font-size: 14px;
+  }
+
+  /* Stack preview thumbnail and metadata */
+  .video-preview {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+  }
+  .video-meta-wrap {
+    width: 100%;
+  }
+  .vm {
+    justify-content: center;
+  }
+
+  /* Format toggle stretches full width */
+  .fmt-toggle {
+    width: 100%;
+    display: flex;
+  }
+  .tog-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  /* Split quality chips into 2 columns */
+  .fmt-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .chip {
+    justify-content: center;
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 32px;
+    letter-spacing: -1.2px;
+  }
+  .hero-desc {
+    font-size: 15px;
+    margin-bottom: 32px;
+  }
 }
